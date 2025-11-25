@@ -1,0 +1,14 @@
+2. Start Backend API (Terminal 1)
+cd project
+uvicorn api.server:app --reload
+3. Start Voice Agent (Terminal 2)
+cd project
+python agent/livekit_agent.py dev
+4. Start Frontend (Terminal 3)
+cd frontend
+npm start
+5. Test in Browser
+
+Open http://localhost:3000
+Join a room
+Talk to the agent

@@ -1,0 +1,3 @@
+pip install -r requirements.txt
+python main.py --ingest --data-dir ./data/raw ### actual documents:
+python main.py --query "What is this document about?"

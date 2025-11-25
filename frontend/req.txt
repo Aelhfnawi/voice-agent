@@ -1,0 +1,23 @@
+# Frontend Dependencies for Voice AI Agent
+
+## Core React
+react@^18.2.0
+react-dom@^18.2.0
+react-scripts@5.0.1
+
+## LiveKit Integration
+@livekit/components-react@^2.0.0
+@livekit/components-styles@^1.0.0
+livekit-client@^2.0.0
+
+## HTTP Client
+axios@^1.6.0
+
+## Installation
+# npm install
+
+## Run Development Server
+# npm start
+
+## Build for Production
+# npm run build

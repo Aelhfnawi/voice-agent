@@ -1,0 +1,66 @@
+2025-11-18 10:02:47,821 - __main__ - INFO - Configuration loaded successfully
+2025-11-18 10:02:47,821 - __main__ - INFO - Initializing Medical RAG Assistant
+2025-11-18 10:02:47,821 - __main__ - INFO - Starting document ingestion from data\raw
+2025-11-18 10:02:47,822 - __main__ - INFO - Setting up ingestion pipeline...
+2025-11-18 10:02:47,822 - src.ingestion.extractor - INFO - DocumentExtractor initialized with method: auto
+2025-11-18 10:02:47,822 - src.ingestion.cleaner - INFO - TextCleaner initialized
+2025-11-18 10:02:47,822 - src.ingestion.chunker - INFO - TextChunker initialized: chunk_size=512, overlap=50
+2025-11-18 10:02:47,823 - src.ingestion.embedder - INFO - Loading embedding model: BAAI/bge-large-en-v1.5
+2025-11-18 10:02:47,823 - src.ingestion.embedder - INFO - Using device: cpu
+2025-11-18 10:02:47,824 - sentence_transformers.SentenceTransformer - INFO - Load pretrained SentenceTransformer: BAAI/bge-large-en-v1.5
+2025-11-18 10:02:50,922 - src.ingestion.embedder - INFO - Model loaded successfully. Embedding dimension: 1024
+2025-11-18 10:02:50,922 - src.ingestion.vector_store - INFO - Created Flat index (exact search)
+2025-11-18 10:02:50,923 - src.ingestion.vector_store - INFO - FAISSVectorStore initialized: type=Flat, dimension=1024
+2025-11-18 10:02:50,923 - __main__ - INFO - Ingestion pipeline ready
+2025-11-18 10:02:50,923 - __main__ - INFO - Creating new vector store...
+2025-11-18 10:02:50,925 - __main__ - INFO - Found 1 documents to process
+2025-11-18 10:02:50,925 - __main__ - INFO - Processing: for task.pdf
+2025-11-18 10:02:50,926 - src.ingestion.extractor - INFO - Extracting text from: for task.pdf
+2025-11-18 10:02:51,224 - src.ingestion.extractor - INFO - Successfully extracted 5858 characters from for task.pdf
+2025-11-18 10:02:51,226 - src.ingestion.chunker - INFO - Created 11 chunks from 5097 characters
+2025-11-18 10:02:51,227 - __main__ - INFO -   -> Created 11 chunks
+2025-11-18 10:02:51,227 - __main__ - INFO - Generating embeddings for 11 chunks...
+2025-11-18 10:02:51,227 - src.ingestion.embedder - INFO - Generating embeddings for 11 texts
+2025-11-18 10:02:54,129 - src.ingestion.embedder - INFO - Generated embeddings shape: (11, 1024)
+2025-11-18 10:02:54,129 - __main__ - INFO - Adding to vector store...
+2025-11-18 10:02:54,129 - src.ingestion.vector_store - INFO - Added 11 vectors to index. Total: 11
+2025-11-18 10:02:54,166 - src.ingestion.vector_store - INFO - Saved index to C:\Users\medoo\OneDrive\Desktop\voice agent\project\data\vector_store\faiss_index
+2025-11-18 10:02:54,166 - __main__ - INFO - Vector store saved to C:\Users\medoo\OneDrive\Desktop\voice agent\project\data\vector_store\faiss_index
+2025-11-18 10:02:54,166 - __main__ - INFO - Document ingestion completed successfully
+2025-11-18 10:02:54,166 - __main__ - INFO - Ingestion complete!
+2025-11-18 10:04:51,729 - __main__ - INFO - Configuration loaded successfully
+2025-11-18 10:04:51,729 - __main__ - INFO - Initializing Medical RAG Assistant
+2025-11-18 10:04:51,730 - __main__ - INFO - Processing query: What is this document about?
+2025-11-18 10:04:51,730 - __main__ - INFO - Initializing RAG pipeline...
+2025-11-18 10:04:51,730 - __main__ - INFO - Loading vector store...
+2025-11-18 10:04:51,730 - src.ingestion.embedder - INFO - Loading embedding model: BAAI/bge-large-en-v1.5
+2025-11-18 10:04:51,730 - src.ingestion.embedder - INFO - Using device: cpu
+2025-11-18 10:04:51,731 - sentence_transformers.SentenceTransformer - INFO - Load pretrained SentenceTransformer: BAAI/bge-large-en-v1.5
+2025-11-18 10:04:54,827 - src.ingestion.embedder - INFO - Model loaded successfully. Embedding dimension: 1024
+2025-11-18 10:04:54,827 - src.ingestion.vector_store - INFO - Created Flat index (exact search)
+2025-11-18 10:04:54,828 - src.ingestion.vector_store - INFO - FAISSVectorStore initialized: type=Flat, dimension=1024
+2025-11-18 10:04:54,849 - src.ingestion.vector_store - INFO - Loaded index from C:\Users\medoo\OneDrive\Desktop\voice agent\project\data\vector_store\faiss_index (11 vectors)
+2025-11-18 10:04:54,850 - src.ingestion.embedder - INFO - Loading embedding model: BAAI/bge-large-en-v1.5
+2025-11-18 10:04:54,850 - src.ingestion.embedder - INFO - Using device: cpu
+2025-11-18 10:04:54,851 - sentence_transformers.SentenceTransformer - INFO - Load pretrained SentenceTransformer: BAAI/bge-large-en-v1.5
+2025-11-18 10:04:57,717 - src.ingestion.embedder - INFO - Model loaded successfully. Embedding dimension: 1024
+2025-11-18 10:04:57,717 - src.retriever.query_engine - INFO - QueryEngine initialized: top_k=5, threshold=0.5
+2025-11-18 10:04:57,717 - src.llm.llm_gateway - INFO - GeminiLLMGateway initialized with model: gemini-2.5-pro
+2025-11-18 10:04:57,718 - src.llm.prompt_template - INFO - PromptTemplate initialized: citations=True, format=inline
+2025-11-18 10:04:57,718 - src.pipeline.rag_pipeline - INFO - RAGPipeline initialized
+2025-11-18 10:04:57,718 - __main__ - INFO - RAG pipeline initialized successfully
+2025-11-18 10:04:57,718 - src.pipeline.rag_pipeline - INFO - Processing query: What is this document about?...
+2025-11-18 10:04:57,718 - src.pipeline.rag_pipeline - INFO - Step 1: Retrieving documents...
+2025-11-18 10:04:57,719 - src.retriever.query_engine - INFO - Retrieving documents for query: What is this document about?...
+2025-11-18 10:04:57,719 - src.ingestion.embedder - INFO - Generating embeddings for 1 texts
+2025-11-18 10:04:57,906 - src.ingestion.embedder - INFO - Generated embeddings shape: (1, 1024)
+2025-11-18 10:04:57,907 - src.retriever.query_engine - INFO - Retrieved 5 documents
+2025-11-18 10:04:57,907 - src.retriever.query_engine - INFO - Assembled context: 2610 characters from 5 documents
+2025-11-18 10:04:57,907 - src.pipeline.rag_pipeline - INFO - Retrieved 5 documents, context length: 2610
+2025-11-18 10:04:57,907 - src.pipeline.rag_pipeline - INFO - Step 2: Formatting prompt...
+2025-11-18 10:04:57,907 - src.pipeline.rag_pipeline - INFO - Step 3: Generating response...
+2025-11-18 10:04:57,907 - src.llm.llm_gateway - INFO - Generating response for prompt (length: 2911)
+2025-11-18 10:05:10,714 - src.llm.llm_gateway - INFO - Generated response (length: 1320)
+2025-11-18 10:05:10,714 - src.pipeline.rag_pipeline - INFO - Step 4: Formatting response...
+2025-11-18 10:05:10,714 - src.pipeline.rag_pipeline - INFO - Query processing completed successfully
+2025-11-18 10:05:10,714 - __main__ - INFO - Query processed successfully
