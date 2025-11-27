@@ -130,11 +130,52 @@ function RoomContent({ roomName, participantName, onDisconnect }) {
   const participants = useParticipants();
   const { localParticipant } = useLocalParticipant();
   const tracks = useTracks([Track.Source.Microphone]);
+  const [messages, setMessages] = useState([]);
+  const [inputText, setInputText] = useState('');
 
   useEffect(() => {
     console.log('Participants:', participants.length);
     console.log('Local participant:', localParticipant?.identity);
   }, [participants, localParticipant]);
+
+  // Send message
+  const handleSendMessage = async () => {
+    if (!inputText.trim() || !localParticipant) return;
+
+    const userMessage = { role: 'user', content: inputText, timestamp: new Date().toLocaleTimeString() };
+    setMessages(prev => [...prev, userMessage]);
+
+    try {
+      // Send to agent via data channel
+      const encoder = new TextEncoder();
+      await localParticipant.publishData(encoder.encode(inputText), { reliable: true });
+
+      setInputText('');
+    } catch (error) {
+      console.error('Error sending message:', error);
+    }
+  };
+
+  // Listen for agent responses
+  useEffect(() => {
+    if (!localParticipant) return;
+
+    const handleDataReceived = (payload, participant) => {
+      const decoder = new TextDecoder();
+      const text = decoder.decode(payload);
+
+      if (participant.identity !== localParticipant.identity) {
+        const agentMessage = { role: 'agent', content: text, timestamp: new Date().toLocaleTimeString() };
+        setMessages(prev => [...prev, agentMessage]);
+      }
+    };
+
+    localParticipant.on('dataReceived', handleDataReceived);
+
+    return () => {
+      localParticipant.off('dataReceived', handleDataReceived);
+    };
+  }, [localParticipant]);
 
   return (
     <div className="room-content">
@@ -179,12 +220,44 @@ function RoomContent({ roomName, participantName, onDisconnect }) {
         <div className="transcript-panel">
           <h3>Conversation</h3>
           <div className="transcript">
-            <div className="transcript-empty">
-              <p>🎙️ Microphone is active</p>
-              <p className="hint">
-                Start talking to the AI agent. It will respond using the knowledge base!
-              </p>
-            </div>
+            {messages.length === 0 ? (
+              <div className="transcript-empty">
+                <p>🎙️ Ready to chat!</p>
+                <p className="hint">
+                  Type your question below or speak (voice coming soon!)
+                </p>
+              </div>
+            ) : (
+              messages.map((message, index) => (
+                <div
+                  key={index}
+                  className={`message ${message.role}`}
+                >
+                  <strong>
+                    {message.role === 'user' ? '👤 You' : '🤖 Agent'}:
+                  </strong>
+                  <p>{message.content}</p>
+                  {message.timestamp && (
+                    <span className="timestamp">{message.timestamp}</span>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Text Input */}
+          <div className="text-input-container">
+            <input
+              type="text"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+              placeholder="Type your question... (e.g., 'What is 2FA?')"
+              className="text-input"
+            />
+            <button onClick={handleSendMessage} className="send-button">
+              Send
+            </button>
           </div>
         </div>
       </div>

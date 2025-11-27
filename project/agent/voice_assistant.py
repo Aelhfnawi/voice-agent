@@ -10,7 +10,12 @@ This module provides:
 import logging
 import asyncio
 import io
+import sys
+from pathlib import Path
 from typing import Optional
+
+# Add project root to path
+sys.path.append(str(Path(__file__).parent.parent))
 
 try:
     from google.cloud import speech_v1 as speech
@@ -137,11 +142,7 @@ Please provide a helpful response. Note: No specific context was found in the kn
 
 if __name__ == "__main__":
     """Test the voice assistant."""
-    import sys
-    from pathlib import Path
     from dotenv import load_dotenv
-    
-    sys.path.append(str(Path(__file__).parent.parent))
     
     logging.basicConfig(level=logging.INFO)
     load_dotenv()

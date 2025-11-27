@@ -1,3 +1,5 @@
+
+.venv\Scripts\activate
 2. Start Backend API (Terminal 1)
 cd project
 uvicorn api.server:app --reload
