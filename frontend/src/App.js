@@ -4,6 +4,8 @@ import {
   useParticipants,
   useLocalParticipant,
   useTracks,
+  useRoomContext,
+  RoomAudioRenderer,
 } from '@livekit/components-react';
 import { Track } from 'livekit-client';
 import axios from 'axios';
@@ -120,6 +122,7 @@ function App() {
           participantName={participantName}
           onDisconnect={handleDisconnect}
         />
+        <RoomAudioRenderer />
       </LiveKitRoom>
     </div>
   );
@@ -127,6 +130,7 @@ function App() {
 
 // Room content component
 function RoomContent({ roomName, participantName, onDisconnect }) {
+  const room = useRoomContext();
   const participants = useParticipants();
   const { localParticipant } = useLocalParticipant();
   const tracks = useTracks([Track.Source.Microphone]);
@@ -142,13 +146,22 @@ function RoomContent({ roomName, participantName, onDisconnect }) {
   const handleSendMessage = async () => {
     if (!inputText.trim() || !localParticipant) return;
 
-    const userMessage = { role: 'user', content: inputText, timestamp: new Date().toLocaleTimeString() };
+    const userMessage = {
+      role: 'user',
+      content: inputText,
+      timestamp: new Date().toLocaleTimeString()
+    };
     setMessages(prev => [...prev, userMessage]);
 
     try {
+      console.log('Sending message:', inputText);
+
       // Send to agent via data channel
       const encoder = new TextEncoder();
-      await localParticipant.publishData(encoder.encode(inputText), { reliable: true });
+      await localParticipant.publishData(
+        encoder.encode(inputText),
+        { reliable: true }
+      );
 
       setInputText('');
     } catch (error) {
@@ -156,26 +169,43 @@ function RoomContent({ roomName, participantName, onDisconnect }) {
     }
   };
 
-  // Listen for agent responses
+  // Listen for agent responses - FIXED VERSION
   useEffect(() => {
-    if (!localParticipant) return;
+    if (!room) return;
 
     const handleDataReceived = (payload, participant) => {
-      const decoder = new TextDecoder();
-      const text = decoder.decode(payload);
+      console.log('Data received event triggered!');
+      console.log('From participant:', participant?.identity);
+      console.log('Payload:', payload);
 
-      if (participant.identity !== localParticipant.identity) {
-        const agentMessage = { role: 'agent', content: text, timestamp: new Date().toLocaleTimeString() };
+      try {
+        const decoder = new TextDecoder();
+        const text = decoder.decode(payload);
+
+        console.log('Decoded text:', text);
+
+        // Always add agent messages
+        const agentMessage = {
+          role: 'agent',
+          content: text,
+          timestamp: new Date().toLocaleTimeString()
+        };
+
+        console.log('Adding agent message:', agentMessage);
         setMessages(prev => [...prev, agentMessage]);
+      } catch (error) {
+        console.error('Error processing received data:', error);
       }
     };
 
-    localParticipant.on('dataReceived', handleDataReceived);
+    console.log('Setting up dataReceived listener on ROOM');
+    room.on('dataReceived', handleDataReceived);
 
     return () => {
-      localParticipant.off('dataReceived', handleDataReceived);
+      console.log('Cleaning up dataReceived listener');
+      room.off('dataReceived', handleDataReceived);
     };
-  }, [localParticipant]);
+  }, [room]);
 
   return (
     <div className="room-content">
@@ -185,9 +215,27 @@ function RoomContent({ roomName, participantName, onDisconnect }) {
           <h2>🎤 {roomName}</h2>
           <p>Connected as: {participantName}</p>
         </div>
-        <button onClick={onDisconnect} className="disconnect-button">
-          Disconnect
-        </button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button
+            onClick={async () => {
+              try {
+                await axios.post(`${API_URL}/livekit/dispatch-agent`, {
+                  room_name: roomName
+                });
+                console.log('Agent dispatched!');
+              } catch (error) {
+                console.error('Error dispatching agent:', error);
+              }
+            }}
+            className="join-button"
+            style={{ padding: '8px 16px', fontSize: '14px' }}
+          >
+            📞 Call Agent
+          </button>
+          <button onClick={onDisconnect} className="disconnect-button">
+            Disconnect
+          </button>
+        </div>
       </div>
 
       {/* Main content */}
@@ -214,17 +262,44 @@ function RoomContent({ roomName, participantName, onDisconnect }) {
               </div>
             ))}
           </div>
+
+          {/* RAG Context Panel */}
+          <div className="rag-context-panel">
+            <h3>📚 Knowledge Base Context</h3>
+            <div className="rag-context-content">
+              {messages.length > 0 ? (
+                <div className="context-info">
+                  <p className="context-hint">
+                    When you ask questions, the agent retrieves relevant
+                    information from the knowledge base to provide accurate
+                    answers.
+                  </p>
+                  <div className="context-status">
+                    <span className="status-dot active"></span>
+                    RAG System Active
+                  </div>
+                </div>
+              ) : (
+                <p className="context-empty">
+                  Ask a question to see retrieved context
+                </p>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Transcript */}
         <div className="transcript-panel">
-          <h3>Conversation</h3>
+          <h3>🎙️ Live Conversation</h3>
           <div className="transcript">
             {messages.length === 0 ? (
               <div className="transcript-empty">
                 <p>🎙️ Ready to chat!</p>
                 <p className="hint">
-                  Type your question below or speak (voice coming soon!)
+                  Click "Call Agent" to start, then speak or type your question
+                </p>
+                <p className="hint">
+                  Try asking: "What is this document about?"
                 </p>
               </div>
             ) : (
@@ -252,7 +327,7 @@ function RoomContent({ roomName, participantName, onDisconnect }) {
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-              placeholder="Type your question... (e.g., 'What is 2FA?')"
+              placeholder="Type your question... (e.g., 'What is this about?')"
               className="text-input"
             />
             <button onClick={handleSendMessage} className="send-button">

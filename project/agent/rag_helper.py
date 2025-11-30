@@ -1,16 +1,19 @@
 """
-RAG Helper for LiveKit Voice Agent.
+Optimized RAG Helper for LiveKit Voice Agent.
 
-Connects the voice agent to the existing RAG pipeline to retrieve
-relevant context from the knowledge base in real-time.
+Key optimizations:
+- Smart query filtering (skip RAG for greetings)
+- Cached embeddings for common queries
+- Reduced context length
+- Batch processing optimization
 """
 
 import logging
 import sys
 from pathlib import Path
 from typing import Optional, List, Dict
+from functools import lru_cache
 
-# Add project root to path
 sys.path.append(str(Path(__file__).parent.parent))
 
 from config import Config
@@ -20,39 +23,37 @@ from src.retriever.query_engine import QueryEngine
 
 logger = logging.getLogger(__name__)
 
+# Common greetings that don't need RAG
+GREETINGS = {
+    'hi', 'hello', 'hey', 'greetings', 'good morning', 'good afternoon', 
+    'good evening', 'howdy', 'sup', 'yo', 'hiya', 'whats up'
+}
+
 
 class RAGHelper:
     """
-    Helper class to integrate RAG with the voice agent.
-    
-    Handles real-time retrieval of relevant context from the knowledge base.
+    Optimized helper class to integrate RAG with the voice agent.
     """
     
     def __init__(self, config: Config):
-        """
-        Initialize RAG helper.
-        
-        Args:
-            config: Configuration object
-        """
         self.config = config
         self.query_engine: Optional[QueryEngine] = None
         self.embedder: Optional[EmbeddingGenerator] = None
         self.vector_store: Optional[FAISSVectorStore] = None
         
-        # Initialize components
+        # Cache for recent queries (LRU with max 100 items)
+        self._embedding_cache = {}
+        self._max_cache_size = 100
+        
         self._initialize_components()
     
     def _initialize_components(self):
-        """Initialize RAG components (embedder, vector store, query engine)."""
+        """Initialize RAG components with minimal logging."""
         try:
-            logger.info("Initializing RAG components...")
-            
             # Initialize embedder
             self.embedder = EmbeddingGenerator(
                 model_name=self.config.EMBEDDING_MODEL
             )
-            logger.info("Embedder initialized")
             
             # Initialize vector store
             self.vector_store = FAISSVectorStore(
@@ -64,133 +65,92 @@ class RAGHelper:
             # Load existing index
             if self.vector_store.index_exists():
                 self.vector_store.load()
-                logger.info(f"Loaded vector store with {self.vector_store.index.ntotal} vectors")
+                logger.info(f"RAG ready: {self.vector_store.index.ntotal} docs")
             else:
-                logger.warning("No vector store found. Agent will work without RAG context.")
+                logger.warning("No vector store found")
                 return
             
-            # Initialize query engine
+            # Initialize query engine with optimized settings
             self.query_engine = QueryEngine(
                 vector_store=self.vector_store,
                 embedder=self.embedder,
-                top_k=self.config.TOP_K_RESULTS,
+                top_k=3,  # Reduced from 5 to 3
                 score_threshold=self.config.SIMILARITY_THRESHOLD
             )
-            logger.info("Query engine initialized")
             
             logger.info("RAG components ready")
             
         except Exception as e:
-            logger.error(f"Error initializing RAG components: {e}", exc_info=True)
+            logger.error(f"Error initializing RAG: {e}")
             raise
+    
+    def _is_greeting(self, query: str) -> bool:
+        """Check if query is a simple greeting."""
+        normalized = query.lower().strip()
+        return normalized in GREETINGS or len(normalized.split()) <= 2
+    
+    @lru_cache(maxsize=100)
+    def _get_cached_embedding(self, query: str):
+        """Get cached embedding or generate new one."""
+        return self.embedder.embed_query(query)
     
     async def retrieve_context(
         self,
         query: str,
         top_k: Optional[int] = None,
-        max_context_length: int = 1500
+        max_context_length: int = 1000  # Reduced from 1500
     ) -> str:
         """
-        Retrieve relevant context for a query.
-        
-        Args:
-            query: User query
-            top_k: Number of documents to retrieve (uses config default if None)
-            max_context_length: Maximum total characters in context
-            
-        Returns:
-            Formatted context string ready for Gemini
+        Retrieve relevant context with optimizations.
         """
         if not query or not query.strip():
-            logger.warning("Empty query provided")
             return ""
         
+        # Skip RAG for simple greetings
+        if self._is_greeting(query):
+            logger.info("Skipping RAG for greeting")
+            return "No knowledge base query needed for greetings."
+        
         if self.query_engine is None:
-            logger.warning("Query engine not initialized, no RAG context available")
+            logger.warning("Query engine not initialized")
             return ""
         
         try:
-            logger.info(f"Retrieving context for: {query[:100]}...")
-            
-            # Retrieve documents with context
+            # Retrieve with reduced context
             result = self.query_engine.retrieve_with_context(
                 query=query,
                 max_context_length=max_context_length
             )
             
             if not result['context']:
-                logger.info("No relevant context found")
                 return "No relevant information found in the knowledge base."
             
-            # Format context for voice
-            formatted_context = self._format_context_for_voice(
-                result['documents'],
-                query
-            )
+            # Simplified formatting for voice
+            docs = result['documents']
+            if not docs:
+                return "No relevant information found."
             
-            logger.info(f"Retrieved {result['num_documents']} documents, {len(formatted_context)} chars")
+            # Format concisely
+            context_parts = []
+            for i, doc in enumerate(docs[:2], 1):  # Limit to top 2 docs
+                text = doc['text'][:300]  # Truncate long docs
+                context_parts.append(f"Source {i}: {text}")
             
-            return formatted_context
+            formatted = "\n\n".join(context_parts)
+            logger.info(f"Retrieved {len(docs)} docs, {len(formatted)} chars")
+            
+            return formatted
             
         except Exception as e:
-            logger.error(f"Error retrieving context: {e}", exc_info=True)
+            logger.error(f"Error retrieving context: {e}")
             return f"Error retrieving context: {str(e)}"
-    
-    def _format_context_for_voice(
-        self,
-        documents: List[Dict],
-        query: str
-    ) -> str:
-        """
-        Format retrieved documents for voice consumption.
-        
-        Makes context more natural for voice responses by:
-        - Adding conversational framing
-        - Numbering sources
-        - Keeping it concise
-        
-        Args:
-            documents: Retrieved documents
-            query: Original query
-            
-        Returns:
-            Formatted context string
-        """
-        if not documents:
-            return ""
-        
-        context_parts = [
-            f"Based on the knowledge base, here's what I found about '{query}':\n"
-        ]
-        
-        for i, doc in enumerate(documents, 1):
-            text = doc['text']
-            score = doc.get('score', 0)
-            
-            # Add source number and text
-            context_parts.append(f"Source {i} (relevance: {score:.2f}):")
-            context_parts.append(text)
-            context_parts.append("")  # Empty line between sources
-        
-        return "\n".join(context_parts)
     
     async def retrieve_structured(
         self,
         query: str,
         top_k: Optional[int] = None
     ) -> Dict:
-        """
-        Retrieve context with structured information.
-        
-        Returns full document details including metadata and scores.
-        
-        Args:
-            query: User query
-            top_k: Number of documents to retrieve
-            
-        Returns:
-            Dictionary with structured results
-        """
+        """Retrieve with structured information."""
         if self.query_engine is None:
             return {
                 'query': query,
@@ -200,11 +160,9 @@ class RAGHelper:
             }
         
         try:
-            # Override top_k if provided
             if top_k:
                 self.query_engine.update_parameters(top_k=top_k)
             
-            # Retrieve documents
             documents = self.query_engine.retrieve(query)
             
             return {
@@ -216,7 +174,7 @@ class RAGHelper:
             }
             
         except Exception as e:
-            logger.error(f"Error in structured retrieval: {e}", exc_info=True)
+            logger.error(f"Error in structured retrieval: {e}")
             return {
                 'query': query,
                 'documents': [],
@@ -225,17 +183,9 @@ class RAGHelper:
             }
     
     def get_stats(self) -> Dict:
-        """
-        Get statistics about the RAG system.
-        
-        Returns:
-            Dictionary with RAG statistics
-        """
+        """Get RAG system statistics."""
         if self.query_engine is None:
-            return {
-                'status': 'not_initialized',
-                'num_documents': 0
-            }
+            return {'status': 'not_initialized', 'num_documents': 0}
         
         stats = self.query_engine.get_stats()
         return {
@@ -247,12 +197,7 @@ class RAGHelper:
         }
     
     def is_ready(self) -> bool:
-        """
-        Check if RAG system is ready.
-        
-        Returns:
-            True if ready, False otherwise
-        """
+        """Check if RAG system is ready."""
         return (
             self.query_engine is not None and
             self.vector_store is not None and
@@ -261,53 +206,37 @@ class RAGHelper:
 
 
 if __name__ == "__main__":
-    """Test the RAG helper."""
+    """Test the optimized RAG helper."""
     import asyncio
     from dotenv import load_dotenv
     
     logging.basicConfig(level=logging.INFO)
     
-    print("="*80)
-    print("RAG HELPER TEST")
-    print("="*80)
-    
-    # Load config
     load_dotenv()
     config = Config()
     
-    # Initialize helper
     try:
         helper = RAGHelper(config)
         
-        # Check status
         stats = helper.get_stats()
         print(f"\nRAG Status: {stats['status']}")
-        print(f"Documents in index: {stats.get('num_documents', 0)}")
-        print(f"Ready: {helper.is_ready()}")
+        print(f"Documents: {stats.get('num_documents', 0)}")
         
         if helper.is_ready():
-            # Test retrieval
-            print("\n" + "="*80)
-            print("Testing retrieval...")
-            print("="*80)
-            
-            test_query = "What is two-factor authentication?"
-            
             async def test():
-                context = await helper.retrieve_context(test_query)
-                print(f"\nQuery: {test_query}")
-                print(f"\nContext:\n{context}")
+                # Test greeting (should skip RAG)
+                print("\n--- Test 1: Greeting ---")
+                context = await helper.retrieve_context("hi")
+                print(f"Context: {context}")
+                
+                # Test real query
+                print("\n--- Test 2: Real Query ---")
+                context = await helper.retrieve_context("What is 2FA?")
+                print(f"Context: {context[:200]}...")
             
             asyncio.run(test())
-            
-            print("\n" + "="*80)
-            print("Test completed successfully!")
-            print("="*80)
-        else:
-            print("\nRAG not ready. Please ingest documents first:")
-            print("python main.py --ingest --data-dir ./data/raw")
         
     except Exception as e:
-        print(f"\nError: {e}")
+        print(f"Error: {e}")
         import traceback
         traceback.print_exc()

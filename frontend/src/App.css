@@ -251,6 +251,54 @@ body {
   }
 }
 
+/* RAG Context Panel */
+.rag-context-panel {
+  margin-top: 20px;
+  background: white;
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.rag-context-panel h3 {
+  color: #333;
+  margin-bottom: 12px;
+  font-size: 1rem;
+}
+
+.rag-context-content {
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.context-info {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.context-hint {
+  line-height: 1.5;
+  margin: 0;
+}
+
+.context-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f0f7ff;
+  border-radius: 6px;
+  font-weight: 500;
+  color: #2196f3;
+}
+
+.context-empty {
+  color: #bbb;
+  font-style: italic;
+  margin: 0;
+}
+
 .audio-visualizer {
   margin-top: 20px;
   padding: 15px;

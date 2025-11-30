@@ -64,3 +64,34 @@
 2025-11-18 10:05:10,714 - src.pipeline.rag_pipeline - INFO - Step 4: Formatting response...
 2025-11-18 10:05:10,714 - src.pipeline.rag_pipeline - INFO - Query processing completed successfully
 2025-11-18 10:05:10,714 - __main__ - INFO - Query processed successfully
+2025-11-29 10:52:18,853 - __main__ - INFO - Configuration loaded successfully
+2025-11-29 10:52:18,854 - __main__ - INFO - Initializing Medical RAG Assistant
+2025-11-29 10:52:18,854 - __main__ - INFO - Starting document ingestion from data\raw
+2025-11-29 10:52:18,854 - __main__ - INFO - Setting up ingestion pipeline...
+2025-11-29 10:52:18,854 - src.ingestion.extractor - INFO - DocumentExtractor initialized with method: auto
+2025-11-29 10:52:18,854 - src.ingestion.cleaner - INFO - TextCleaner initialized
+2025-11-29 10:52:18,854 - src.ingestion.chunker - INFO - TextChunker initialized: chunk_size=512, overlap=50
+2025-11-29 10:52:18,854 - src.ingestion.embedder - INFO - Loading embedding model: BAAI/bge-large-en-v1.5
+2025-11-29 10:52:18,854 - src.ingestion.embedder - INFO - Using device: cpu
+2025-11-29 10:52:18,855 - sentence_transformers.SentenceTransformer - INFO - Load pretrained SentenceTransformer: BAAI/bge-large-en-v1.5
+2025-11-29 10:52:21,878 - src.ingestion.embedder - INFO - Model loaded successfully. Embedding dimension: 1024
+2025-11-29 10:52:21,878 - src.ingestion.vector_store - INFO - Created Flat index (exact search)
+2025-11-29 10:52:21,878 - src.ingestion.vector_store - INFO - FAISSVectorStore initialized: type=Flat, dimension=1024
+2025-11-29 10:52:21,879 - __main__ - INFO - Ingestion pipeline ready
+2025-11-29 10:52:21,879 - __main__ - INFO - Loading existing vector store...
+2025-11-29 10:52:21,883 - src.ingestion.vector_store - INFO - Loaded index from C:\Users\medoo\OneDrive\Desktop\voice agent\project\data\vector_store\faiss_index (11 vectors)
+2025-11-29 10:52:21,884 - __main__ - INFO - Found 1 documents to process
+2025-11-29 10:52:21,884 - __main__ - INFO - Processing: for task.pdf
+2025-11-29 10:52:21,885 - src.ingestion.extractor - INFO - Extracting text from: for task.pdf
+2025-11-29 10:52:22,163 - src.ingestion.extractor - INFO - Successfully extracted 5858 characters from for task.pdf
+2025-11-29 10:52:22,177 - src.ingestion.chunker - INFO - Created 11 chunks from 5097 characters
+2025-11-29 10:52:22,177 - __main__ - INFO -   -> Created 11 chunks
+2025-11-29 10:52:22,177 - __main__ - INFO - Generating embeddings for 11 chunks...
+2025-11-29 10:52:22,177 - src.ingestion.embedder - INFO - Generating embeddings for 11 texts
+2025-11-29 10:52:46,122 - src.ingestion.embedder - INFO - Generated embeddings shape: (11, 1024)
+2025-11-29 10:52:46,122 - __main__ - INFO - Adding to vector store...
+2025-11-29 10:52:46,153 - src.ingestion.vector_store - INFO - Added 11 vectors to index. Total: 22
+2025-11-29 10:52:46,160 - src.ingestion.vector_store - INFO - Saved index to C:\Users\medoo\OneDrive\Desktop\voice agent\project\data\vector_store\faiss_index
+2025-11-29 10:52:46,160 - __main__ - INFO - Vector store saved to C:\Users\medoo\OneDrive\Desktop\voice agent\project\data\vector_store\faiss_index
+2025-11-29 10:52:46,160 - __main__ - INFO - Document ingestion completed successfully
+2025-11-29 10:52:46,160 - __main__ - INFO - Ingestion complete!

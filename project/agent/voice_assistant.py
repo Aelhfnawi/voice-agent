@@ -1,176 +1,133 @@
 """
-Voice Assistant implementation using Google Speech APIs.
-
-This module provides:
-- Speech-to-Text (Google Cloud Speech)
-- Text generation with RAG (Gemini)
-- Text-to-Speech (Google Cloud TTS)
+Optimized Voice Assistant with smart response handling.
 """
 
 import logging
 import asyncio
-import io
 import sys
 from pathlib import Path
 from typing import Optional
 
-# Add project root to path
 sys.path.append(str(Path(__file__).parent.parent))
 
 try:
-    from google.cloud import speech_v1 as speech
-    from google.cloud import texttospeech_v1 as texttospeech
     import google.generativeai as genai
+    from google.generativeai.types import HarmCategory, HarmBlockThreshold
     GOOGLE_APIS_AVAILABLE = True
 except ImportError:
     GOOGLE_APIS_AVAILABLE = False
-    logging.warning("Google Cloud APIs not available")
+    logging.warning("Google APIs not available")
 
 from agent.rag_helper import RAGHelper
 from config import Config
 
 logger = logging.getLogger(__name__)
 
+# Quick responses for common patterns
+QUICK_RESPONSES = {
+    'hi': "Hello! I'm your AI assistant. How can I help you?",
+    'hello': "Hi there! What can I help you with?",
+    'hey': "Hey! What would you like to know?",
+    'thanks': "You're welcome!",
+    'thank you': "Happy to help!",
+    'bye': "Goodbye!",
+}
+
 
 class VoiceAssistant:
-    """
-    Voice assistant that processes speech and generates responses.
-    
-    Uses:
-    - Google Speech-to-Text for transcription
-    - RAG for context retrieval
-    - Gemini for response generation
-    - Google Text-to-Speech for audio output
-    """
+    """Optimized voice assistant."""
     
     def __init__(self, config: Config, rag_helper: RAGHelper):
-        """
-        Initialize voice assistant.
-        
-        Args:
-            config: Configuration object
-            rag_helper: RAG helper for context retrieval
-        """
         self.config = config
         self.rag_helper = rag_helper
         
-        # Initialize Gemini for text generation
         genai.configure(api_key=config.GEMINI_API_KEY)
-        self.model = genai.GenerativeModel(config.GEMINI_MODEL)
+        
+        # Configure safety settings to allow more content
+        safety_settings = {
+            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+        }
+        
+        self.model = genai.GenerativeModel(
+            config.GEMINI_MODEL,
+            safety_settings=safety_settings,
+            generation_config={
+                'temperature': 0.3,
+                'max_output_tokens': 512,
+                'top_p': 0.9
+            }
+        )
         
         logger.info("VoiceAssistant initialized")
     
-    async def process_audio_chunk(self, audio_data: bytes) -> Optional[str]:
-        """
-        Process audio chunk and return transcription.
+    def _get_quick_response(self, query: str) -> Optional[str]:
+        """Check for quick response patterns."""
+        normalized = query.lower().strip()
         
-        Args:
-            audio_data: Raw audio bytes (PCM format)
-            
-        Returns:
-            Transcribed text or None
-        """
-        # This would use Google Speech-to-Text API
-        # For now, return None as we need proper audio streaming setup
+        if normalized in QUICK_RESPONSES:
+            return QUICK_RESPONSES[normalized]
+        
+        if 'thank' in normalized:
+            return QUICK_RESPONSES['thanks']
+        if 'bye' in normalized:
+            return QUICK_RESPONSES['bye']
+        
         return None
     
     async def generate_response(self, user_query: str) -> str:
-        """
-        Generate response using RAG and Gemini.
-        
-        Args:
-            user_query: User's question
-            
-        Returns:
-            Generated response text
-        """
+        """Generate response with optimization."""
         try:
-            logger.info(f"Generating response for: {user_query[:100]}")
+            quick_response = self._get_quick_response(user_query)
+            if quick_response:
+                logger.info(f"Quick response for: {user_query[:50]}")
+                return quick_response
             
-            # Step 1: Retrieve context from RAG
-            context = await self.rag_helper.retrieve_context(user_query)
+            logger.info(f"Generating response for: {user_query[:50]}")
             
-            # Step 2: Build prompt with context
-            if context and context != "No relevant information found in the knowledge base.":
-                prompt = f"""Context from knowledge base:
-{context}
-
-User question: {user_query}
-
-Please provide a clear and concise answer based on the context above. If the context doesn't contain enough information, say so."""
-            else:
-                prompt = f"""User question: {user_query}
-
-Please provide a helpful response. Note: No specific context was found in the knowledge base for this question."""
-            
-            # Step 3: Generate response with Gemini
-            response = await asyncio.to_thread(
-                self.model.generate_content,
-                prompt
+            context = await self.rag_helper.retrieve_context(
+                user_query,
+                max_context_length=800
             )
             
-            answer = response.text if hasattr(response, 'text') else str(response)
+            if context and "No relevant information" not in context:
+                prompt = f"""Context: {context}
+
+Question: {user_query}
+
+Answer briefly (2-3 sentences max)."""
+            else:
+                prompt = f"""Question: {user_query}
+
+Answer briefly (2-3 sentences)."""
             
-            logger.info(f"Generated response: {len(answer)} characters")
+            response = await asyncio.wait_for(
+                asyncio.to_thread(
+                    self.model.generate_content,
+                    prompt
+                ),
+                timeout=15.0
+            )
+            
+            try:
+                answer = response.text
+            except ValueError:
+                # Handle cases where response is blocked or empty
+                logger.warning(f"Response content generation failed. Finish reason: {response.candidates[0].finish_reason if response.candidates else 'Unknown'}")
+                logger.warning(f"Safety ratings: {response.candidates[0].safety_ratings if response.candidates else 'Unknown'}")
+                logger.warning(f"Prompt feedback: {response.prompt_feedback}")
+                return "I apologize, but I am unable to generate a response to that specific query."
+            
+            logger.info(f"Generated response: {len(answer)} chars")
             return answer
             
+        except asyncio.TimeoutError:
+            return "Response timed out. Please try again."
         except Exception as e:
-            logger.error(f"Error generating response: {e}", exc_info=True)
-            return "I apologize, but I encountered an error processing your question. Please try again."
+            logger.error(f"Error: {e}")
+            return "I encountered an error. Please rephrase your question."
     
     async def text_to_speech(self, text: str) -> bytes:
-        """
-        Convert text to speech audio.
-        
-        Args:
-            text: Text to convert
-            
-        Returns:
-            Audio data as bytes
-        """
-        # This would use Google Text-to-Speech API
-        # For now, return empty bytes
-        # In production, implement:
-        # client = texttospeech.TextToSpeechClient()
-        # synthesis_input = texttospeech.SynthesisInput(text=text)
-        # voice = texttospeech.VoiceSelectionParams(...)
-        # audio_config = texttospeech.AudioConfig(...)
-        # response = client.synthesize_speech(...)
-        # return response.audio_content
         return b""
-
-
-if __name__ == "__main__":
-    """Test the voice assistant."""
-    from dotenv import load_dotenv
-    
-    logging.basicConfig(level=logging.INFO)
-    load_dotenv()
-    
-    print("="*80)
-    print("VOICE ASSISTANT TEST")
-    print("="*80)
-    
-    try:
-        config = Config()
-        rag_helper = RAGHelper(config)
-        assistant = VoiceAssistant(config, rag_helper)
-        
-        # Test text generation
-        async def test():
-            query = "What is two-factor authentication?"
-            print(f"\nQuery: {query}")
-            
-            response = await assistant.generate_response(query)
-            print(f"\nResponse:\n{response}")
-        
-        asyncio.run(test())
-        
-        print("\n" + "="*80)
-        print("Test completed!")
-        print("="*80)
-        
-    except Exception as e:
-        print(f"Error: {e}")
-        import traceback
-        traceback.print_exc()

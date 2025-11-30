@@ -72,6 +72,16 @@ project/
 
 ## 🚀 Quick Start Guide
 
+### One-Click Startup (Windows)
+```batch
+start_app.bat
+```
+This will automatically:
+- Activate the virtual environment
+- Start the Backend API
+- Start the Voice Agent
+- Start the Frontend
+
 ### Complete Setup and Run
 
 ```bash

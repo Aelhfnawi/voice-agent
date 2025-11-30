@@ -104,53 +104,45 @@ class GeminiRAGVoiceAgent:
             participant: Participant to interact with
         """
         try:
-            logger.info("Starting voice processing pipeline...")
+            logger.info("Initializing voice pipeline...")
             
-            # Create an audio source to publish responses
-            source = rtc.AudioSource(24000, 1)  # 24kHz, mono
-            track = rtc.LocalAudioTrack.create_audio_track("agent_voice", source)
+            # Subscribe to participant's audio track
+            audio_track = None
+            for track_pub in participant.track_publications.values():
+                if track_pub.track and track_pub.track.kind == rtc.TrackKind.KIND_AUDIO:
+                    audio_track = track_pub.track
+                    logger.info("Found audio track")
+                    break
             
-            # Publish the audio track
-            options = rtc.TrackPublishOptions()
-            options.source = rtc.TrackSource.SOURCE_MICROPHONE
-            
-            publication = await ctx.room.local_participant.publish_track(track, options)
-            logger.info("Audio track published")
-            
-            # Send welcome message
-            welcome_msg = "Hello! I'm your AI assistant. I can answer questions using the knowledge base. Try asking me something!"
-            logger.info(f"Sending welcome: {welcome_msg}")
-            
-            # For now, we'll use a simple loop that waits for data channel messages
-            # In production, you'd process actual audio streams
-            
-            # Listen for data channel messages (text input for testing)
-            def on_data_received(data: rtc.DataPacket):
-                if data.kind == rtc.DataPacketKind.KIND_RELIABLE:
-                    text = data.data.decode('utf-8')
-                    logger.info(f"Received text message: {text}")
-                    
-                    # Process with voice assistant in background task
-                    async def process_message():
-                        response = await self.voice_assistant.generate_response(text)
-                        logger.info(f"Generated response: {response[:100]}...")
-                        
-                        # Send back as text
-                        await ctx.room.local_participant.publish_data(
-                            response.encode('utf-8'),
-                            reliable=True
-                        )
-                    
-                    asyncio.create_task(process_message())
-            
-            ctx.room.on("data_received", on_data_received)
-            
-            logger.info("Agent is ready and listening...")
-            
-            # Keep agent alive
-            while True:
-                await asyncio.sleep(1)
+            if not audio_track:
+                logger.error("No audio track found, waiting...")
+                # Wait for audio track
+                async def wait_for_audio():
+                    while True:
+                        for track_pub in participant.track_publications.values():
+                            if track_pub.track and track_pub.track.kind == rtc.TrackKind.KIND_AUDIO:
+                                return track_pub.track
+                        await asyncio.sleep(0.5)
                 
+                audio_track = await asyncio.wait_for(wait_for_audio(), timeout=30)
+                logger.info("Audio track acquired")
+            
+            # Simple voice detection loop
+            logger.info("Agent is listening and ready to respond...")
+            
+            # Send a welcome message via text
+            await ctx.room.local_participant.publish_data(
+                "Hello! I'm your AI assistant. Ask me anything about the knowledge base!",
+                reliable=True
+            )
+            
+            # Keep connection alive and log activity
+            while True:
+                await asyncio.sleep(5)
+                logger.debug("Agent is active and listening...")
+                
+        except asyncio.TimeoutError:
+            logger.error("Timeout waiting for audio track")
         except Exception as e:
             logger.error(f"Error in agent loop: {e}", exc_info=True)
     
@@ -301,3 +293,4 @@ if __name__ == "__main__":
             entrypoint_fnc=GeminiRAGVoiceAgent(Config()).entrypoint,
         )
     ))
+    

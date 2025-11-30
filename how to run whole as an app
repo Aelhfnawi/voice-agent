@@ -1,8 +1,10 @@
 
 .venv\Scripts\activate
+cd project
+pip install -r requirements.txt
 2. Start Backend API (Terminal 1)
 cd project
-uvicorn api.server:app --reload
+uvicorn api.server:app --host 127.0.0.1 --port 8000
 3. Start Voice Agent (Terminal 2)
 cd project
 python agent/livekit_agent.py dev
@@ -14,3 +16,20 @@ npm start
 Open http://localhost:3000
 Join a room
 Talk to the agent
+
+
+or
+
+1. One-Click Start
+Double-click the "start_app.bat" file in this folder.
+
+This will automatically:
+- Start the Backend API (Terminal 1)
+- Start the Voice Agent (Terminal 2)
+- Start the Frontend (Terminal 3)
+- Open your browser to http://localhost:3000
+
+Just wait for all windows to appear and the browser to open!
+
+
+
